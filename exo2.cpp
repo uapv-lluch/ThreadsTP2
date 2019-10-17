@@ -35,7 +35,7 @@ public:
         this->erase(remove_if(this->begin(), this->end(), ::ispunct), this->end());
     }
 
-    void replaceNumbersToLetters() {
+    void replaceNumbersToString() {
         while (find_if(this->begin(), this->end(), ::isdigit) != this->end()) {
             iterator it = find_if(this->begin(), this->end(), ::isdigit);
             int nb = *it -
@@ -45,50 +45,45 @@ public:
     }
 };
 
-using Task = function<StringPlus()>;
+using Task = function<void()>;
 
 class Pipeline {
 private:
     vector<thread> threads;
-    vector<queue<Task>> tasksQueues;
+    vector<queue<StringPlus>> stringsQueues;
     vector<mutex> mutexes;
     vector<StringPlus> strings;
-    mutex m;
-    mutex n;
+    mutex m1;
+    mutex m2;
+    mutex m3;
+    mutex m4;
 
-    void addTask(unsigned line, Task task) {
-        tasksQueues[line].push(task);
+    void addTask(unsigned line, StringPlus &str) {
+        stringsQueues[line].push(str);
     }
 
 public:
     Pipeline() {
         threads.resize(4);
-        tasksQueues.resize(4);
-//        mutexes.resize(4);
-        strings = {
+        stringsQueues.resize(4);
+        vector<StringPlus> tempStrings = {
                 "L'artiste a réalisé 4 belle peintures."
         };
-        for (StringPlus &str : strings) {
+        for (StringPlus &str : tempStrings) {
             addTask(str);
         }
     }
 
     Pipeline(vector<StringPlus> strings) {
         threads.resize(4);
-        tasksQueues.resize(4);
-//        mutexes.resize(4);
-        this->strings = move(strings);
-        for (StringPlus &str : this->strings) {
+        stringsQueues.resize(4);
+        for (StringPlus &str : strings) {
             addTask(str);
         }
     }
 
     void addTask(StringPlus &str) {
-        Task task = [&str] {
-            str.toLower();
-            return str;
-        };
-        tasksQueues[0].push(task);
+        stringsQueues[0].push(str);
     }
 
     void showStrings() {
@@ -99,38 +94,61 @@ public:
 
     void start() {
         auto processToLower = [this] {
-            while (!tasksQueues[0].empty()) {
-                m.lock();
-                Task task = tasksQueues[0].front();
-                StringPlus str = task();
-                Task nextTask = [&str] {
-                    str.tokenize();
-                    return str;
-                };
-                addTask(1, nextTask);
-                tasksQueues[0].pop();
-                m.unlock();
+            while (!stringsQueues[0].empty()) {
+                m1.lock();
+                StringPlus str = stringsQueues[0].front();
+                str.toLower();
+                addTask(1, str);
+                stringsQueues[0].pop();
+                m1.unlock();
             }
         };
 
         auto processTokenize = [this] {
-            while (!tasksQueues[0].empty() && !tasksQueues[1].empty()) {
-                n.lock();
-                Task task = tasksQueues[1].front();
-                StringPlus str = task();
-                /*Task nextTask = [&str] {
-                    str.removePunctuation();
-                    return str;
-                };
-                addTask(2, nextTask);*/
-                tasksQueues[1].pop();
-                n.unlock();
+            while (!stringsQueues[0].empty() || !stringsQueues[1].empty()) {
+                m2.lock();
+                if (!stringsQueues[1].empty()) {
+                    StringPlus str = stringsQueues[1].front();
+                    str.tokenize();
+                    addTask(2, str);
+                    stringsQueues[1].pop();
+                }
+                m2.unlock();
             }
         };
+
+        auto processRemovePunctuation = [this] {
+            while (!stringsQueues[0].empty() || !stringsQueues[1].empty() || !stringsQueues[2].empty()) {
+                m3.lock();
+                if (!stringsQueues[2].empty()) {
+                    StringPlus str = stringsQueues[2].front();
+                    str.removePunctuation();
+                    addTask(3, str);
+                    stringsQueues[2].pop();
+                }
+                m3.unlock();
+            }
+        };
+
+        auto processReplaceNumbersToString = [this] {
+            while (!stringsQueues[0].empty() || !stringsQueues[1].empty() || !stringsQueues[2].empty() || !stringsQueues[3].empty()) {
+                m4.lock();
+                if (!stringsQueues[3].empty()) {
+                    StringPlus str = stringsQueues[3].front();
+                    str.replaceNumbersToString();
+                    stringsQueues[3].pop();
+                    strings.push_back(str);
+                }
+                m4.unlock();
+            }
+        };
+
         threads[0] = thread(processToLower);
         threads[1] = thread(processTokenize);
+        threads[2] = thread(processRemovePunctuation);
+        threads[3] = thread(processReplaceNumbersToString);
 
-        for (unsigned i = 0; i < 2; ++i) {
+        for (unsigned i = 0; i < threads.size(); ++i) {
             if (threads[i].joinable()) {
                 threads[i].join();
             }
@@ -140,13 +158,10 @@ public:
 
 int main() {
     StringPlus stringPlus = "L'artiste a réalisé 4 belle peintures.";
-    /*stringPlus.toLower();
-    stringPlus.tokenize();
-    stringPlus.removePunctuation();
-    stringPlus.replaceNumbersToLetters();
-    cout << stringPlus << endl;*/
+    StringPlus stringPlus2 = "Le maçon a construit 2 grande maison.";
+    StringPlus stringPlus3 = "L' a réalisé 4 belle peintures.";
 
-    Pipeline pipeline;
+    Pipeline pipeline({stringPlus, stringPlus2, stringPlus3});
     pipeline.start();
     pipeline.showStrings();
 }
