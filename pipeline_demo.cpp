@@ -7,7 +7,7 @@
 
 using namespace std;
 
-using Task = function<void(int)>;
+using Task = function<void()>;
 
 int main () {
     vector<thread> threads;
@@ -34,9 +34,7 @@ int main () {
 
     threads.emplace_back([&] {
         while (true) {
-            Task task = [] (int n) {
-                cout << "Task : " << n << endl;
-            };
+            Task task;
             {
                 if (q1.empty()) {
                     while(taskCompleted[1] != taskNb) {
@@ -47,7 +45,7 @@ int main () {
                 task = move(q1.front());
                 q1.pop();
             }
-            task(1);
+            task();
             ++taskCompleted[0];
             m2.unlock();
         }
@@ -55,9 +53,7 @@ int main () {
 
     threads.emplace_back([&] {
         while (true) {
-            Task task = [] (int n) {
-                cout << "Task : " << n << endl;
-            };
+            Task task;
             {
                 m2.lock();
                 if (q2.empty()) {
@@ -66,7 +62,7 @@ int main () {
                 task = move(q2.front());
                 q2.pop();
             }
-            task(2);
+            task();
             ++taskCompleted[1];
         }
     });

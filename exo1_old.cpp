@@ -4,12 +4,9 @@
 #include <vector>
 #include <mutex>
 #include <functional>
-#include <condition_variable>
 
 
 using namespace std;
-
-using Task = function<double long()>;
 
 unsigned long long fact(int n) {
     unsigned long long fact = 1;
@@ -27,12 +24,9 @@ class ThreadPool {
 private:
     vector<thread> workers;
     vector<int> tasksQueue;
-    vector<Task> tasksQueueBis;
     double long result = 0;
     unsigned nbThreads = 4;
     mutex m;
-    mutex threadsEnd;
-    condition_variable end;
 public:
     ThreadPool() {
 //        nbThreads = thread::hardware_concurrency();
@@ -45,8 +39,8 @@ public:
         return result;
     }
 
-    void addTask(const Task& task) {
-        tasksQueueBis.push_back(task);
+    void addTask(int task) {
+        tasksQueue.push_back(task);
     }
 
     void showTasks() {
@@ -58,20 +52,19 @@ public:
     void start() {
         function<void()> searchAndExecute = [this] () {
             double long temp = 0;
-            while (!tasksQueueBis.empty()) {
+            while (!tasksQueue.empty()) {
+                int i = tasksQueue.back();
+                tasksQueue.pop_back();
+                temp = formule(i);
                 m.lock();
-                if (!tasksQueueBis.empty()) {
-                    Task task = tasksQueueBis.back();
-                    tasksQueueBis.pop_back();
-                    temp = task();
-//                    cout << this_thread::get_id() << endl;
-                    result += temp;
-                }
+//                cout << this_thread::get_id() << " : " << i << endl; // Affiche l'id du thread suivi du nombre pour lequel est executé le calcul
+                result += temp;
                 m.unlock();
             }
         };
         for (unsigned i = 0 ; i < nbThreads ; ++i) {
             workers[i] = thread(searchAndExecute);
+//            workers.push_back(thread(searchAndExecute));
         }
         for (unsigned i = 0 ; i < workers.size() ; ++i) {
             if (workers[i].joinable()) {
@@ -94,15 +87,11 @@ int main() {
     int n = 50;
     ThreadPool threadPool = ThreadPool();
     for (int i = 0 ; i < n ; ++i) {
-        threadPool.addTask([i] {
-            return formule(i);
-        });
+        threadPool.addTask(i);
     }
     threadPool.start();
     cout << "Calcul séquenciel : " << eMoinsUnSequentiel() << endl;
     cout << "Calcul threadé : " << threadPool.getResult() << endl;
     return 0;
 }
-
-
 
