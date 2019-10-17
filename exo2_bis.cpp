@@ -95,7 +95,7 @@ public:
     void start() {
         auto processToLower = [this] {
             while (!stringsQueues[0].empty()) {
-                m1.lock();
+//                m1.lock();
                 StringPlus str = stringsQueues[0].front();
                 str.toLower();
                 addTask(1, str);
@@ -159,9 +159,11 @@ public:
 int main() {
     StringPlus stringPlus = "L'artiste a réalisé 4 belles peintures.";
     StringPlus stringPlus2 = "Le maçon a construit 2 grandes maisons.";
-    StringPlus stringPlus3 = "Le suricate a creusé 6 trous";
+    StringPlus stringPlus3 = "Le SURICATE a creusé 6 trous";
 
     Pipeline pipeline({stringPlus, stringPlus2, stringPlus3});
     pipeline.start();
     pipeline.showStrings();
 }
+
+
